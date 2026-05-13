@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum ReviewStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum Severity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+enum FindingCategory {
+  SECURITY
+  PERFORMANCE
+  STYLE
+  CORRECTNESS
+}
+
+enum TeamRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+model User {
+  id           String       @id @default(cuid())
+  githubId     String       @unique
+  email        String       @unique
+  name         String?
+  avatarUrl    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  repositories Repository[]
+  reviews      Review[]
+  memberships  TeamMember[]
+
+  @@map("users")
+}
+
+model Repository {
+  id             String       @id @default(cuid())
+  githubRepoId   Int          @unique
+  fullName       String       @unique // "owner/repo"
+  owner          String
+  name           String
+  installationId Int
+  webhookSecret  String // per-repo HMAC secret
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  ownerId        String
+  ownerUser      User         @relation(fields: [ownerId], references: [id])
+  reviews        Review[]
+  rules          Rule[]
+  members        TeamMember[]
+
+  @@map("repositories")
+}
+
+model Review {
+  id           String       @id @default(cuid())
+  prNumber     Int
+  prTitle      String
+  prUrl        String
+  headSha      String
+  baseSha      String
+  status       ReviewStatus @default(PENDING)
+  summary      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  repositoryId String
+  repository   Repository   @relation(fields: [repositoryId], references: [id])
+  authorId     String?
+  author       User?        @relation(fields: [authorId], references: [id])
+  findings     Finding[]
+
+  @@unique([repositoryId, prNumber, headSha]) // idempotency key
+  @@map("reviews")
+}
+
+model Finding {
+  id        String          @id @default(cuid())
+  filePath  String
+  lineStart Int
+  lineEnd   Int?
+  severity  Severity
+  category  FindingCategory
+  message   String
+  suggestion String?
+  createdAt DateTime        @default(now())
+  ruleId    String?
+  rule      Rule?           @relation(fields: [ruleId], references: [id])
+  reviewId  String
+  review    Review          @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@map("findings")
+}
+
+model Rule {
+  id           String          @id @default(cuid())
+  name         String
+  description  String?
+  category     FindingCategory
+  severity     Severity        @default(WARNING)
+  isEnabled    Boolean         @default(true)
+  pattern      String? // regex or rule DSL
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  repositoryId String? // null = global rule; non-null = repo-scoped override
+  repository   Repository?     @relation(fields: [repositoryId], references: [id])
+  findings     Finding[]
+
+  @@map("rules")
+}
+
+model TeamMember {
+  id           String     @id @default(cuid())
+  role         TeamRole   @default(MEMBER)
+  createdAt    DateTime   @default(now())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+
+  @@unique([userId, repositoryId])
+  @@map("team_members")
+}
