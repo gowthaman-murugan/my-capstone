@@ -5,26 +5,27 @@ export interface ValidationError {
   message: string;
 }
 
-export interface ValidationResult<T> {
-  success: boolean;
-  data?: T;
-  errors?: ValidationError[];
-}
+export type ValidationResult<T> =
+  | { success: true; data: T; errors?: never }
+  | { success: false; data?: never; errors: ValidationError[] };
 
-export function validateData<T>(schema: z.ZodSchema, data: unknown): ValidationResult<T> {
+export function validateData<S extends z.ZodSchema>(
+  schema: S,
+  data: unknown
+): ValidationResult<z.infer<S>> {
   try {
     const result = schema.parse(data);
     return { success: true, data: result };
   } catch (error) {
     if (error instanceof ZodError) {
-      const errors = error.flatten().fieldErrors;
+      const errors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
       const formattedErrors: ValidationError[] = [];
 
       for (const [field, messages] of Object.entries(errors)) {
         if (messages && messages.length > 0) {
           formattedErrors.push({
             field,
-            message: messages[0],
+            message: messages[0]!,
           });
         }
       }

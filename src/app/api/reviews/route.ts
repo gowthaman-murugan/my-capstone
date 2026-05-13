@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    return NextResponse.json({ data: result.data.data, meta: result.data.meta }, { status: 200 });
+    return NextResponse.json({ data: result.data!.data, meta: result.data!.meta }, { status: 200 });
   } catch (error) {
     console.error('Error in GET /api/reviews:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

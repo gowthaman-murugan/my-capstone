@@ -7,7 +7,7 @@ export const successResponseSchema = z.object({
 
 export const errorResponseSchema = z.object({
   error: z.string(),
-  issues: z.record(z.unknown()).optional(),
+  issues: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Pagination metadata

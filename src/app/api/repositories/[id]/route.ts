@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRepositoryById } from './get-handler';
 import { updateRepository } from './update-handler';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
-    const result = await getRepositoryById(params.id);
+    const result = await getRepositoryById(id);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 404 });
@@ -17,10 +18,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     const body = await request.json();
-    const result = await updateRepository(params.id, body);
+    const result = await updateRepository(id, body);
 
     if (!result.success) {
       if (result.errors) {
