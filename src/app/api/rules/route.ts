@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRules } from './handler';
+import { requireAuth } from '@/lib/session';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
   try {
     const url = new URL(request.url);
     const page = url.searchParams.get('page') || '1';

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRepositoryById } from './get-handler';
 import { updateRepository } from './update-handler';
+import { requireAuth } from '@/lib/session';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
   const { id } = await params;
   try {
     const result = await getRepositoryById(id);
@@ -19,8 +22,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
   const { id } = await params;
   try {
+    // Only the repository owner may update settings
+    const repo = await getRepositoryById(id);
+    if (!repo.success || repo.data?.ownerId !== auth) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const body = await request.json();
     const result = await updateRepository(id, body);
 

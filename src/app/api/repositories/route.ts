@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRepositories } from './handler';
 import { createRepository } from './create-handler';
 import { paginationQuerySchema } from '@/types/schemas/common';
+import { requireAuth } from '@/lib/session';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
   try {
     const url = new URL(request.url);
     const page = url.searchParams.get('page') || '1';
@@ -36,10 +39,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
     const body = await request.json();
-    const userId = 'user-123'; // TODO: Get from session
 
-    const result = await createRepository(body, userId);
+    const result = await createRepository(body, auth);
 
     if (!result.success) {
       if (result.errors) {
