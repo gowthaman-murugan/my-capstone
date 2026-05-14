@@ -25,5 +25,5 @@ export const listResponseSchema = z.object({
 // Common query parameters
 export const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().default(20),
+  limit: z.coerce.number().int().positive().max(100).default(20),
 });

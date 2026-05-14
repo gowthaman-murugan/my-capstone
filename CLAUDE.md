@@ -42,11 +42,12 @@ This project is inspired by modern automated review systems such as:
 | Backend | Next.js Route Handlers |
 | ORM | Prisma |
 | Database | PostgreSQL |
-| Authentication | NextAuth/Auth.js (planned) |
-| Background Jobs | Queue-based async processing |
+| Authentication | NextAuth.js 4 (GitHub OAuth, JWT sessions) |
+| Validation | Zod schemas in `src/types/schemas/` |
+| Data Fetching | SWR (client), Prisma (server) |
 | AI/Analysis | Internal rule engine + MCP integrations |
-| CI/CD | GitHub Actions |
-| Testing | Vitest, React Testing Library, Playwright |
+| CI/CD | GitHub Actions (`.github/workflows/ci.yml`) |
+| Testing | Vitest + coverage-v8 |
 
 ---
 
@@ -80,6 +81,81 @@ This project is inspired by modern automated review systems such as:
 └── CI/CD
     └── GitHub Actions
 ```
+
+---
+
+# Implemented File Structure
+
+```
+src/
+├── app/
+│   ├── (auth)/login/page.tsx           # GitHub OAuth login
+│   ├── (dashboard)/                    # Protected dashboard (layout.tsx wraps all)
+│   │   ├── page.tsx                    # Overview
+│   │   ├── repositories/[id]/          # Repository detail + settings
+│   │   ├── reviews/[id]/               # Review detail with findings
+│   │   ├── rules/                      # Global rule management
+│   │   └── team/                       # Team member management
+│   └── api/
+│       ├── auth/[...nextauth]/route.ts # NextAuth OAuth
+│       ├── repositories/               # CRUD + github-info + members + pull-requests
+│       ├── reviews/                    # GET list
+│       ├── rules/                      # GET list + POST create
+│       └── webhooks/github/            # (pending) GitHub App events
+├── components/
+│   ├── ui/                             # Base primitives (Button, Card, Modal, Table…)
+│   ├── layout/                         # Sidebar, NavLink, UserMenu
+│   ├── repositories/                   # Repo table, AddRepositoryModal, WebhookConfigCard
+│   ├── reviews/                        # ReviewTable, FindingsList, FindingCard
+│   ├── rules/                          # RulesTable, CreateRuleModal
+│   └── team/                           # MembersTable, InviteMemberModal
+├── hooks/                              # SWR data hooks (useRepositories, useReviews…)
+├── lib/
+│   ├── auth.ts                         # NextAuth config
+│   ├── db.ts                           # Prisma singleton
+│   ├── env.ts                          # Zod env validation (called at startup)
+│   ├── fetcher.ts                      # SWR fetcher
+│   ├── github-mcp.ts                   # MCP client (fetchGitHubRepoInfo, fetchGitHubPullRequest)
+│   ├── session.ts                      # requireAuth() helper
+│   └── validate.ts                     # Generic Zod validator
+├── middleware.ts                       # Auth guard for all routes
+└── types/
+    ├── index.ts                        # Shared TS interfaces
+    ├── schemas/                        # Zod schemas (common, repository, review, rule, team)
+    └── next-auth.d.ts                  # Session type augmentation
+```
+
+---
+
+# API Layer Pattern
+
+Every resource follows the **split handler** pattern to keep HTTP concerns separate from business logic:
+
+```
+src/app/api/{resource}/
+├── route.ts            ← HTTP: parse request, call handler, return NextResponse
+├── handler.ts          ← Business logic: list/read (no HTTP types)
+└── create-handler.ts   ← Business logic: create (no HTTP types)
+```
+
+**Rules:**
+- `route.ts` calls `requireAuth()` first — always
+- Handler functions accept plain objects, not `Request`/`Response`
+- Validation uses `schema.safeParse()` — never `.parse()` (throws)
+- Zod schemas live in `src/types/schemas/`, imported by both route and handler
+
+---
+
+# Security Patterns
+
+All implemented in Phase 3 (see `docs/SECURITY-AUDIT.md`):
+
+- **Auth guard:** `requireAuth()` in `src/lib/session.ts` — returns `string | NextResponse`
+- **Owner check:** `repo.ownerId === auth` before mutations
+- **Membership check:** `prisma.teamMember.findUnique` for non-owner access
+- **Pagination cap:** `limit` max 100 in `src/types/schemas/common.ts`
+- **Security headers:** `next.config.ts` — X-Frame-Options, CSP, HSTS, nosniff
+- **Env validation:** `getEnv()` in `src/lib/env.ts` validates all vars at startup
 
 ---
 
@@ -250,3 +326,29 @@ The current implementation spawns an MCP server subprocess per request. For high
 - AI model training infrastructure
 - Source code hosting
 - Enterprise compliance tooling
+
+---
+
+# Custom Claude Commands
+
+Located in `.claude/commands/`:
+
+| Command | Description |
+|---------|-------------|
+| `deploy-check` | Pre-deployment verification checklist (env, tests, migrations, headers) |
+| `security-scan` | Full security audit of API endpoints, secrets, injection, headers |
+| `add-feature` | Step-by-step scaffold: schema → handler → route → hook → component → page → tests |
+
+---
+
+# CI/CD
+
+`.github/workflows/ci.yml` runs on every PR and push to `main`:
+
+| Job | Steps |
+|-----|-------|
+| `test` | `npm run lint` → `tsc --noEmit` → `prisma generate` → `prisma migrate deploy` → `vitest --coverage` |
+| `build` | `prisma generate` → `next build` |
+| `security` | `npm audit --audit-level=high` |
+
+Coverage reports and audit JSON are uploaded as GitHub Actions artifacts.

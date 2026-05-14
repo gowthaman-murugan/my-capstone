@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRepositoryById } from '../get-handler';
 import { fetchGitHubRepoInfo } from '@/lib/github-mcp';
 import { requireAuth } from '@/lib/session';
+import { prisma } from '@/lib/db';
 
-/**
- * GET /api/repositories/[id]/github-info
- *
- * Fetches live repository metadata from GitHub via the GitHub MCP server.
- * Returns real-time data like description, language, star count, and open
- * issue count without requiring a webhook event to trigger it.
- */
+async function verifyRepoAccess(repoId: string, userId: string, ownerId: string): Promise<boolean> {
+  if (ownerId === userId) return true;
+  const membership = await prisma.teamMember.findUnique({
+    where: { userId_repositoryId: { userId, repositoryId: repoId } },
+  });
+  return membership !== null;
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -20,6 +22,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const repoResult = await getRepositoryById(id);
     if (!repoResult.success || !repoResult.data) {
       return NextResponse.json({ error: 'Repository not found' }, { status: 404 });
+    }
+
+    const hasAccess = await verifyRepoAccess(id, auth, repoResult.data.ownerId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { owner, name } = repoResult.data;
