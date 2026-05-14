@@ -82,4 +82,23 @@ describe('GET /api/rules', () => {
       orderBy: { createdAt: 'desc' },
     });
   });
+
+  // Edge cases
+
+  it('should return error for an invalid category enum value', async () => {
+    const result = await getRules({ category: 'INVALID_CATEGORY' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid query parameters');
+    expect(prisma.rule.findMany).not.toHaveBeenCalled();
+  });
+
+  it('should return error when the database throws', async () => {
+    vi.mocked(prisma.rule.findMany).mockRejectedValueOnce(new Error('Timeout'));
+
+    const result = await getRules({ page: 1, limit: 20 });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Failed to fetch rules');
+  });
 });

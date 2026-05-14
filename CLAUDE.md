@@ -149,6 +149,80 @@ Critical flows:
 
 ---
 
+# MCP Integration
+
+## Overview
+
+CodeReview Bot uses the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) to integrate with external services. MCP enables structured, tool-based communication between the application and external APIs without tight coupling.
+
+## Configured MCP Servers
+
+The project root contains `.mcp.json` which configures MCP servers for Claude Code developer tooling:
+
+| Server | Package | Purpose |
+|---|---|---|
+| `github` | `@modelcontextprotocol/server-github` | Fetch repo metadata, PR details, diffs |
+| `filesystem` | `@modelcontextprotocol/server-filesystem` | Read/write project files |
+
+## Environment Variables
+
+```bash
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx   # Required for GitHub MCP server
+```
+
+## Application-Level MCP Usage
+
+The app uses `@modelcontextprotocol/sdk` to call MCP servers programmatically from API routes.
+
+**Client utility:** `src/lib/github-mcp.ts`
+
+| Export | MCP Tool Called | Description |
+|---|---|---|
+| `fetchGitHubRepoInfo(owner, repo)` | `get_repository` | Live repo metadata (stars, language, description) |
+| `fetchGitHubPullRequest(owner, repo, prNumber)` | `get_pull_request` | PR details for review preparation |
+
+**API routes using MCP:**
+
+| Route | Method | Description |
+|---|---|---|
+| `/api/repositories/[id]/github-info` | GET | Live GitHub repository metadata via MCP |
+| `/api/repositories/[id]/pull-requests/[prNumber]` | GET | Live PR details via MCP |
+
+## Architecture
+
+```text
+Next.js API Route
+      │
+      ▼
+src/lib/github-mcp.ts   ← MCP Client (StdioClientTransport)
+      │
+      ▼
+npx @modelcontextprotocol/server-github   ← MCP Server subprocess
+      │
+      ▼
+GitHub REST API
+```
+
+## Development Setup
+
+1. Set `GITHUB_TOKEN` in your `.env.local`:
+   ```
+   GITHUB_TOKEN=ghp_your_token_here
+   ```
+
+2. The `.mcp.json` file is automatically picked up by Claude Code for developer tooling.
+
+3. The MCP SDK (`@modelcontextprotocol/sdk`) is installed as a project dependency — no separate setup needed for the application integration.
+
+## Production Notes
+
+The current implementation spawns an MCP server subprocess per request. For high-traffic production use, consider:
+- A persistent MCP server process with a connection pool
+- Replacing the stdio transport with an HTTP/SSE MCP server
+- Caching responses for read-only GitHub data
+
+---
+
 # Scope Boundaries
 
 ## This Project Includes

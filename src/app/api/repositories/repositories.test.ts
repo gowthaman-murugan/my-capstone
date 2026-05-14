@@ -83,4 +83,22 @@ describe('GET /api/repositories', () => {
       orderBy: { createdAt: 'desc' },
     });
   });
+
+  // Edge cases
+
+  it('should return error for a negative page number', async () => {
+    const result = await getRepositories({ page: -1 });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid pagination parameters');
+    expect(prisma.repository.findMany).not.toHaveBeenCalled();
+  });
+
+  it('should return error for a zero limit', async () => {
+    const result = await getRepositories({ page: 1, limit: 0 });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid pagination parameters');
+    expect(prisma.repository.findMany).not.toHaveBeenCalled();
+  });
 });

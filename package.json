@@ -24,6 +24,7 @@
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/webhooks": "^14.2.0",
     "@prisma/client": "^5.22.0",
     "dotenv": "^17.4.2",
@@ -39,6 +40,7 @@
     "@types/node": "^25.7.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.6",
     "@vitest/ui": "^4.1.6",
     "autoprefixer": "^10.5.0",
     "eslint": "^9.39.4",

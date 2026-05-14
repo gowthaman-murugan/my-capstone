@@ -85,4 +85,23 @@ describe('GET /api/reviews', () => {
       orderBy: { createdAt: 'desc' },
     });
   });
+
+  // Edge cases
+
+  it('should return error for an invalid status enum value', async () => {
+    const result = await getReviews({ status: 'INVALID_STATUS' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Invalid query parameters');
+    expect(prisma.review.findMany).not.toHaveBeenCalled();
+  });
+
+  it('should return error when the database throws', async () => {
+    vi.mocked(prisma.review.findMany).mockRejectedValueOnce(new Error('Connection lost'));
+
+    const result = await getReviews({ page: 1, limit: 20 });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Failed to fetch reviews');
+  });
 });
